@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liste des VMs</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Liste des Machines Virtuelles</h1>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Nom de la VM</th>
+                    <th>État</th>
+                    <th>UUID</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vm_name, vm_info in vms.items() %}
+                <tr>
+                    <td>{{ vm_name }}</td>
+                    <td>{{ 'En cours d\'exécution' if vm_info.state == 1 else 'Arrêtée' }}</td>
+                    <td>{{ vm_info.uuid }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

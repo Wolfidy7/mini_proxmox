@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Créer une VM</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Créer une nouvelle Machine Virtuelle</h1>
+        <form method="POST">
+            <div class="form-group">
+                <label for="vm_name">Nom de la VM</label>
+                <input type="text" class="form-control" id="vm_name" name="vm_name" required>
+            </div>
+            <div class="form-group">
+                <label for="ram_size">Taille de la RAM (MiB)</label>
+                <input type="number" class="form-control" id="ram_size" name="ram_size" required>
+            </div>
+            <div class="form-group">
+                <label for="vcpu_count">Nombre de vCPUs</label>
+                <input type="number" class="form-control" id="vcpu_count" name="vcpu_count" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Créer la VM</button>
+        </form>
+        <a href="{{ url_for('list_vms') }}" class="btn btn-link">Retour à la liste des VMs</a>
+    </div>
+</body>
+</html>
