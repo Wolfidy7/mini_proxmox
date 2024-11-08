@@ -9,24 +9,53 @@
 <body>
     <div class="container mt-5">
         <h1>Liste des Machines Virtuelles</h1>
-        <table class="table table-bordered">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="alert alert-info">
+                    {% for message in messages %}
+                        <p>{{ message }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        <table class="table">
             <thead>
                 <tr>
-                    <th>Nom de la VM</th>
+                    <th>Nom</th>
                     <th>État</th>
-                    <th>UUID</th>
+                    <th>RAM (MiB)</th>
+                    <th>vCPU</th>
+                    <th>Espace disque (MiB)</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
-                {% for vm_name, vm_info in vms.items() %}
+                {% for name, info in vms.items() %}
                 <tr>
-                    <td>{{ vm_name }}</td>
-                    <td>{{ 'En cours d\'exécution' if vm_info.state == 1 else 'Arrêtée' }}</td>
-                    <td>{{ vm_info.uuid }}</td>
+                    <td>{{ name }}</td>
+                    <td>{{ info.state }}</td>
+                    <td>{{ info.ram }}</td>
+                    <td>{{ info.vcpu }}</td>
+                    <td>{{ info.disk }}</td>
+                    <td>
+                        {% if info.state == 'En cours d\'exécution' %}
+                        <form method="POST" action="{{ url_for('stop_vm', vm_name=name) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-danger">Arrêter</button>
+                        </form>
+                        <form method="POST" action="{{ url_for('restart_vm', vm_name=name) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-warning">Redémarrer</button>
+                        </form>
+                        {% else %}
+                        <form method="POST" action="{{ url_for('start_vm', vm_name=name) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-success">Démarrer</button>
+                        </form>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        <a href="{{ url_for('create_vm') }}" class="btn btn-primary">Créer une nouvelle VM</a>
     </div>
 </body>
 </html>
