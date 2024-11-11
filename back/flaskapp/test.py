@@ -1,7 +1,10 @@
 import os
+import shutil
+import subprocess
 from time import sleep
 from flask import Flask, render_template, request, redirect, url_for, flash
 import libvirt
+import psutil
 
 app = Flask(__name__)
 app.secret_key = 'supersecretkey'  # Nécessaire pour utiliser les messages flash
@@ -27,6 +30,7 @@ def get_disk_size(disk_path):
 @app.route('/vms', methods=['GET'])
 def list_vms():
     conn = get_connection()
+    hypervisor_info = get_hypervisor_info()
     if conn is None:
         flash("Échec de la connexion à l'hyperviseur.", 'error')
         return redirect(url_for('list_vms'))
@@ -66,94 +70,7 @@ def list_vms():
         }
 
     conn.close()
-    return render_template('vms.html', vms=vms)
-
-@app.route('/create_vm', methods=['GET', 'POST'])
-def create_vm():
-    conn = None  # Initialiser conn à None
-    if request.method == 'POST':
-        try:
-            # Récupérer les informations envoyées par le formulaire
-            vm_name = request.form['vm_name']
-            ram_size = int(request.form['ram_size']) * 1024  # Convertir en Ko
-            vcpu_count = int(request.form['vcpu_count'])
-            iso_file = request.files['iso_file']
-            
-            # Générer le chemin pour le fichier disque de la VM
-            disk_file_path = os.path.join(DISK_STORAGE_PATH, f"{vm_name}.qcow2")
-            
-            # Vérifier l'existence du fichier disque
-            if not os.path.exists(disk_file_path):
-                flash(f"Le fichier disque {disk_file_path} n'existe pas.", 'error')
-                return redirect(url_for('create_vm'))
-            
-            # Enregistrer le fichier ISO si fourni
-            if iso_file and iso_file.filename.endswith('.iso'):
-                iso_file_path = os.path.join(ISO_STORAGE_PATH, iso_file.filename)
-                iso_file.save(iso_file_path)
-            else:
-                flash('Le fichier téléchargé n\'est pas un fichier ISO valide.', 'error')
-                return redirect(url_for('create_vm'))
-
-            # Créer la définition XML pour la VM
-            vm_xml = f"""
-            <domain type='kvm'>
-                <name>{vm_name}</name>
-                <memory>{ram_size}</memory>
-                <vcpu>{vcpu_count}</vcpu>
-                <os>
-                    <type arch='x86_64' machine='pc-i440fx-2.9'>hvm</type>
-                    <boot dev='cdrom'/>
-                    <boot dev='hd'/>
-                </os>
-                <devices>
-                    <disk type='file' device='disk'>
-                        <driver name='qemu' type='qcow2'/>
-                        <source file='{disk_file_path}'/>
-                        <target dev='vda' bus='virtio'/>
-                    </disk>
-                    <disk type='file' device='cdrom'>
-                        <driver name='qemu' type='raw'/>
-                        <source file='{iso_file_path}'/>
-                        <target dev='hdc' bus='ide'/>
-                        <readonly/>
-                    </disk>
-                    <interface type='network'>
-                        <mac address='52:54:00:6b:29:66'/>
-                        <source network='default'/>
-                        <model type='virtio'/>
-                    </interface>
-                    <graphics type='vnc' port='-1' listen='0.0.0.0'/>
-                </devices>
-            </domain>
-            """
-
-            # Connexion et création de la VM
-            conn = get_connection()
-            if conn is None:
-                flash('Échec de la connexion à l\'hyperviseur.', 'error')
-                return redirect(url_for('create_vm'))
-
-            # Création de la VM à partir du XML
-            conn.createXML(vm_xml, 0)
-            flash(f'La VM "{vm_name}" a été créée avec succès !', 'success')
-        
-        except KeyError as e:
-            flash(f'Erreur dans le formulaire: {str(e)}', 'error')
-            return redirect(url_for('create_vm'))
-        
-        except libvirt.libvirtError as e:
-            flash(f'Erreur lors de la création de la VM : {str(e)}', 'error')
-        
-        finally:
-            if conn:
-                conn.close()
-        
-        return redirect(url_for('list_vms'))
-    
-    return render_template('create_vm.html')
-
-
+    return render_template('vms.html', vms=vms, hypervisor_info=hypervisor_info)
 
 
 # Démarre une VM
@@ -242,6 +159,99 @@ def restart_vm(vm_name):
     
     return redirect(url_for('list_vms'))
 
+
+def sauvegarder_vm(nom_vm, chemin_sauvegarde):
+    try:
+        # Connexion à l'hyperviseur
+        conn = libvirt.open('qemu:///system')
+        if conn is None:
+            print("Échec de la connexion à l'hyperviseur")
+            return False
+
+        # Obtenir le domaine de la VM
+        domaine = conn.lookupByName(nom_vm)
+        if domaine is None:
+            print(f"VM '{nom_vm}' non trouvée")
+            conn.close()
+            return False
+
+        # Sauvegarder l'état actuel de la VM dans le fichier spécifié
+        domaine.save(chemin_sauvegarde)
+        print(f"État de la VM '{nom_vm}' sauvegardé avec succès dans {chemin_sauvegarde}")
+        conn.close()
+        return True
+
+    except libvirt.libvirtError as e:
+        print(f"Erreur libvirt : {e}")
+        return False
+
+
+def restaurer_vm(chemin_sauvegarde):
+    try:
+        # Connexion à l'hyperviseur
+        conn = libvirt.open('qemu:///system')
+        if conn is None:
+            print("Échec de la connexion à l'hyperviseur")
+            return False
+
+        # Restaurer la VM depuis le fichier de sauvegarde
+        conn.restore(chemin_sauvegarde)
+        print(f"VM restaurée depuis le fichier {chemin_sauvegarde}")
+        conn.close()
+        return True
+
+    except libvirt.libvirtError as e:
+        print(f"Erreur libvirt : {e}")
+        return False
+    
+def get_hypervisor_info():
+    # Exemple pour récupérer les informations du système
+    try:
+        # Nom de l'hyperviseur (on utilise une commande virsh pour KVM)
+        hypervisor_name = subprocess.check_output("hostname", shell=True).decode().strip()
+
+        # Version (avec une commande spécifique à l'hyperviseur)
+        hypervisor_version = subprocess.check_output("virsh --version", shell=True).decode().strip()
+
+        # Nombre total de CPU
+        cpus = psutil.cpu_count(logical=False)
+
+        # Mémoire totale (en MiB)
+        memory = psutil.virtual_memory().total // (1024 * 1024)
+
+        # Espace disque disponible (en MiB)
+        storage = psutil.disk_usage('/').free // (1024 * 1024)
+
+        return {
+            'name': hypervisor_name,
+            'version': hypervisor_version,
+            'cpus': cpus,
+            'memory': memory,
+            'storage': storage
+        }
+    except Exception as e:
+        print(f"Error retrieving hypervisor info: {e}")
+        return {}
+
+# Sauvegarde l'état d'une VM
+@app.route('/save_vm/<string:vm_name>', methods=['POST'])
+def save_vm(vm_name):
+    chemin_sauvegarde = os.path.join(DISK_STORAGE_PATH, f"{vm_name}.sav")  # Chemin de sauvegarde pour la VM
+    if sauvegarder_vm(vm_name, chemin_sauvegarde):
+        flash(f"L'état de la VM '{vm_name}' a été sauvegardé avec succès.", 'success')
+    else:
+        flash(f"Erreur lors de la sauvegarde de la VM '{vm_name}'.", 'error')
+    return redirect(url_for('list_vms'))
+
+# Restaure l'état d'une VM
+@app.route('/restore_vm/<string:vm_name>', methods=['POST'])
+def restore_vm(vm_name):
+    chemin_sauvegarde = os.path.join(DISK_STORAGE_PATH, f"{vm_name}.sav")  # Chemin de sauvegarde pour la VM
+    if restaurer_vm(chemin_sauvegarde):
+        flash(f"La VM '{vm_name}' a été restaurée avec succès.", 'success')
+    else:
+        flash(f"Erreur lors de la restauration de la VM '{vm_name}'.", 'error')
+    return redirect(url_for('list_vms'))
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

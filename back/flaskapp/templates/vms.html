@@ -4,11 +4,203 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Liste des VMs</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        /* Général */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            color: #333;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Container principal */
+        .container {
+            background: #ffffff;
+            padding: 2rem;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+
+        /* Titre principal */
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: #4A90E2;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        /* Informations de l'hyperviseur */
+        .hypervisor-info {
+            background-color: #e9f5ff;
+            border: 1px solid #bce0f1;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 2rem;
+        }
+
+        .hypervisor-info h2 {
+            font-size: 1.5rem;
+            color: #4A90E2;
+            margin-bottom: 1rem;
+        }
+
+        .hypervisor-info p {
+            margin: 0.2rem 0;
+            font-weight: 500;
+        }
+
+        /* Messages flash */
+        .alert-info {
+            background-color: #e6f3ff;
+            color: #31708f;
+            border: 1px solid #bce8f1;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 5px;
+        }
+
+        .alert-info p {
+            margin: 0;
+        }
+
+        /* Table des VMs */
+        .table {
+            width: 100%;
+            margin-top: 1.5rem;
+            border-collapse: collapse;
+            background-color: #ffffff;
+        }
+
+        .table th,
+        .table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .table th {
+            background-color: #4A90E2;
+            color: #fff;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .table tr:nth-child(even) {
+            background-color: #f7f9fc;
+        }
+
+        /* Boutons d'action */
+        button {
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            margin-right: 0.5rem;
+        }
+
+        .btn-success {
+            background-color: #28a745;
+            color: #ffffff;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn-success:hover {
+            background-color: #218838;
+        }
+
+        .btn-danger {
+            background-color: #dc3545;
+            color: #ffffff;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+
+        .btn-warning {
+            background-color: #ffc107;
+            color: #ffffff;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn-warning:hover {
+            background-color: #e0a800;
+        }
+
+        .btn-primary {
+            background-color: #007bff;
+            color: #ffffff;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: #ffffff;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+
+        /* Boutons en ligne */
+        form {
+            display: inline;
+        }
+
+        button:focus {
+            outline: none;
+            box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .table th, .table td {
+                padding: 0.75rem;
+            }
+
+            button {
+                font-size: 0.85rem;
+                padding: 0.5rem 0.8rem;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="container mt-5">
         <h1>Liste des Machines Virtuelles</h1>
+
+        <!-- Informations de l'hyperviseur -->
+        <div class="hypervisor-info">
+            <h2>Informations de l'Hyperviseur</h2>
+            <p>Nom de l'Hyperviseur : {{ hypervisor_info.name }}</p>
+            <p>Version : {{ hypervisor_info.version }}</p>
+            <p>Processeurs Totaux : {{ hypervisor_info.cpus }}</p>
+            <p>Mémoire Totale (MiB) : {{ hypervisor_info.memory }}</p>
+            <p>Espace de Stockage Disponible (MiB) : {{ hypervisor_info.storage }}</p>
+        </div>
+        
+        <!-- Messages flash -->
         {% with messages = get_flashed_messages() %}
             {% if messages %}
                 <div class="alert alert-info">
@@ -18,6 +210,7 @@
                 </div>
             {% endif %}
         {% endwith %}
+        
         <table class="table">
             <thead>
                 <tr>
@@ -38,24 +231,34 @@
                     <td>{{ info.vcpu }}</td>
                     <td>{{ info.disk }}</td>
                     <td>
+                        <!-- Bouton Démarrer/Arrêter en fonction de l'état de la VM -->
                         {% if info.state == 'En cours d\'exécution' %}
-                        <form method="POST" action="{{ url_for('stop_vm', vm_name=name) }}" style="display:inline;">
-                            <button type="submit" class="btn btn-danger">Arrêter</button>
-                        </form>
-                        <form method="POST" action="{{ url_for('restart_vm', vm_name=name) }}" style="display:inline;">
-                            <button type="submit" class="btn btn-warning">Redémarrer</button>
-                        </form>
+                            <form method="POST" action="{{ url_for('stop_vm', vm_name=name) }}" style="display:inline;">
+                                <button type="submit" class="btn btn-danger">Arrêter</button>
+                            </form>
+                            <form method="POST" action="{{ url_for('restart_vm', vm_name=name) }}" style="display:inline;">
+                                <button type="submit" class="btn btn-warning">Redémarrer</button>
+                            </form>
                         {% else %}
-                        <form method="POST" action="{{ url_for('start_vm', vm_name=name) }}" style="display:inline;">
-                            <button type="submit" class="btn btn-success">Démarrer</button>
-                        </form>
+                            <form method="POST" action="{{ url_for('start_vm', vm_name=name) }}" style="display:inline;">
+                                <button type="submit" class="btn btn-success">Démarrer</button>
+                            </form>
                         {% endif %}
+                        
+                        <!-- Bouton Sauvegarder -->
+                        <form method="POST" action="{{ url_for('save_vm', vm_name=name) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-primary">Sauvegarder</button>
+                        </form>
+
+                        <!-- Bouton Restaurer -->
+                        <form method="POST" action="{{ url_for('restore_vm', vm_name=name) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-secondary">Restaurer</button>
+                        </form>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-        <a href="{{ url_for('create_vm') }}" class="btn btn-primary">Créer une nouvelle VM</a>
     </div>
 </body>
 </html>

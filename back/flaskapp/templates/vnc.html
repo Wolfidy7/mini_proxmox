@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VM Console</title>
+    <script type="text/javascript" src="path/to/novnc/vnc.js"></script>
+</head>
+<body>
+    <h2>Console for {{ vm_name }}</h2>
+    <div id="noVNC_container"></div>
+    <script type="text/javascript">
+        var rfb = new RFB(document.getElementById('noVNC_container'), "{{ vnc_url }}");
+        rfb.viewOnly = false; // Vous pouvez désactiver cette ligne si vous voulez que l'utilisateur interagisse avec la VM
+    </script>
+</body>
+</html>
