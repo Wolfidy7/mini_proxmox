@@ -7,7 +7,7 @@ import libvirt
 import psutil
 
 app = Flask(__name__)
-app.secret_key = 'supersecretkey'  # Nécessaire pour utiliser les messages flash
+app.secret_key = 'supersecretkey'  
 ISO_STORAGE_PATH = '/var/lib/libvirt/iso' 
 DISK_STORAGE_PATH = '/var/lib/libvirt/images' 
 
@@ -118,7 +118,7 @@ def stop_vm(vm_name):
         if state == libvirt.VIR_DOMAIN_SHUTOFF:
             flash(f'La VM "{vm_name}" est déjà arrêtée.', 'info')
         elif state == libvirt.VIR_DOMAIN_RUNNING:
-            domain.destroy()  # Utilise shutdown pour un arrêt propre
+            domain.destroy() 
             flash(f'La VM "{vm_name}" a été arrêtée avec succès.', 'success')
         else:
             flash(f'La VM "{vm_name}" est dans un état qui ne permet pas l\'arrêt.', 'info')
